@@ -4,8 +4,10 @@ import numpy as np
 import math
 
 # file that you want to use
-filename = "WhatsApp-chat met Congolezen.txt"
-savename = "Congolezen_"
+# be sure to change this before running the script
+filename = "WhatsApp-chat met LustrumCie - 10 oktober.txt"
+savename = "Lustrum_"
+
 # open the file, decide upon encoding type.
 f = open(filename, mode='r', encoding="utf8")
 # initialise empty list to store the data, and empty counts for different errors
@@ -49,7 +51,9 @@ for line in f:
     # reformate date information to suit Pandas Timeseries
     date = "20" + date_t[-2:] + "-" + date_t[3:5] + "-" + date_t[:2]
     datetime = date+time
+
     if text[:6] == 'U hebt':
+        # If you are the group owner, this can change your actions to your name
         # if the owner changes somethins, name isn't registered that is fixed here
         name = 'Thomas Dolman'
 
@@ -62,8 +66,9 @@ df = pd.DataFrame(data, columns=["Date", "Name", "Text"])
 # change index into timeseries.
 df.Date = pd.to_datetime(df.Date, format='%Y-%m-%d')
 df = df.set_index('Date')
-# ugly way of removing this name from the dataframe
-df = df[df.Name != "Anneliek Ter Horst heeft een nieuw nummer"]
+if filename == "WhatsApp-chat met Congolezen.txt":
+    # ugly way of removing this name from the dataframe
+    df = df[df.Name != "Anneliek Ter Horst heeft een nieuw nummer"]
 
 # returns number of posts per name sorted
 df_count = df.groupby(by='Name').count().sort_values(by='Text')
@@ -74,6 +79,8 @@ plot_count = sns.countplot(x="Name", data=df)
 plt.xticks(rotation=90)
 plt.tight_layout()
 plt.ylabel("Messages send")
+import os
+os.chdir('Output')
 plt.savefig(savename + "Messages_send")
 
 # check what words are said most, independent of by who
@@ -102,7 +109,6 @@ del word_count['<media']
 del word_count['weggelaten>']
 # show results
 print(word_count)
-word_count[0]
 # hier kan nog iets leuks mee!!
 # check categories, such as people
 names_count = {}
@@ -129,12 +135,14 @@ plt.ylabel('Messages send')
 plt.title("Messages send over time")
 plt.savefig(savename + "When_we_talk")
 
-df_weekly_count.loc['2017-7-24':].plot()
-plt.ylabel('Messages send')
-plt.title("Messages send over time")
-plt.savefig(savename + "When_we_talk_zoomed")
+# hier iets verzinnen
+if filename == "WhatsApp-chat met Congolezen.txt":
+    df_weekly_count.loc['2017-7-24':].plot()
+    plt.ylabel('Messages send')
+    plt.title("Messages send over time")
+    plt.savefig(savename + "When_we_talk_zoomed")
 
-# wanneer praten we onafhankelijk van de dag. welk tijdstip
+# wanneer praten we onafhankelijk van de dag welk tijdstip
 df_hour_count = df.resample('H').count()
 df_hour_count['Date'] = df_hour_count.index.hour
 hourly_act = {}
