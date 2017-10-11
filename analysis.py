@@ -44,7 +44,11 @@ def analysewords(df, df_count):
                 try:
                     person_first, addit, addit2, person_second = person.lower().split(" ")
                 except ValueError:
-                    person_first, addit, addit2, addit3, person_second = person.lower().split(" ")
+                    try:
+                        person_first, addit, addit2, addit3, person_second = person.lower().split(" ")
+                    except ValueError:
+                        person_first = person
+                        person_second = person
 
         names_count[person_first] = word_count[person_first]
         names_count[person_second] = word_count[person_second]
@@ -64,48 +68,80 @@ def loadtext(filename):
     # initialise empty list to store the data, and empty counts for different errors
     data = []
 
+    Group_Owner = input("If you are the owner of the group, type your name here: ")
+
+    #check type of phone used, the text output is different.
+    device = input("Is your device an Iphone (i) or an Android (a)? ")
+
     count_a, count_b = 0, 0
     # loop over all lines in the text file
     for line in f:
         # print each line for visual inspection
         print(line.strip())
 
-        # attempt to split line
-        try:
-            datetime, content = line.split(" - ")
-            date_t, time = datetime.split(",")
-            # if this works, continue by splitting the content
+        if device == 'i':
+            if len(line)<3:
+                continue
             try:
-                name, text = content.split(": ")
-                # otherwise store no name
+                datetime, name, text = line.split(": ")
+                date_t, time = datetime.split(" ")
             except ValueError:
-                name = np.nan
-                text = content
+                try:
+                    datetime, content = line.split(": ")
+                    date_t, time = datetime.split(" ")
+                    try:
+                        name, text = content.split(": ")
+                    except ValueError:
+                        name = np.nan
+                        text = content
+                except ValueError:
+                    try:
+                        datetime, name, content, content1 = line.split(": ")
+                        text = content + ": " + content1
+                        date_t, time = datetime.split(" ")
+                    except ValueError:
+                        text = line
 
-        except ValueError:
+
+        elif device == 'a':
             try:
-                # special cases, where there seems to be no text in the message
-                datetime_old, namedate, content = line.split(" - ")
-                name_old, datetime = namedate.split(": ")
+                # attempt to split line
+                datetime, content = line.split(" - ")
                 date_t, time = datetime.split(",")
-                count_a += 1
+                # if this works, continue by splitting the content
                 try:
                     name, text = content.split(": ")
+                    # otherwise store no name
                 except ValueError:
                     name = np.nan
                     text = content
-                # sometimes the person uses an Enter, this cathes that problem
+
             except ValueError:
-                text = line
-                count_b += 1
+                try:
+                    # special cases, where there seems to be no text in the message
+                    datetime_old, namedate, content = line.split(" - ")
+                    name_old, datetime = namedate.split(": ")
+                    date_t, time = datetime.split(",")
+                    count_a += 1
+                    try:
+                        name, text = content.split(": ")
+                    except ValueError:
+                        name = np.nan
+                        text = content
+                    # sometimes the person uses an Enter, this cathes that problem
+                except ValueError:
+                    text = line
+                    count_b += 1
 
 
         # reformate date information to suit Pandas Timeseries
         date = "20" + date_t[-2:] + "-" + date_t[3:5] + "-" + date_t[:2]
-        datetime = date+time
+        datetime = date+" "+time
 
 
         # catch a known error
+        # TODO find a better solution for this.
+
         if datetime == "20af-vr-Ik vanaf “borreltijd” gaat de CK gewoon dicht toch":
             datetime, content, content1 = line.split(" - ")
             content = content + content1
@@ -113,16 +149,21 @@ def loadtext(filename):
             date_t, time = datetime.split(",")
             date = "20" + date_t[-2:] + "-" + date_t[3:5] + "-" + date_t[:2]
             datetime = date + time
+        if datetime =='2022-21-20 okt' or datetime =='2012-11-10 nov':
+            datetime = "2017-07-23 00:04:11"
+            name = "Marloes Westerwoudt"
+            text = "Inschrijven voor een weekend!!"
 
         if text[:6] == 'U hebt':
             # If you are the group owner, this can change your actions to your name
             # if the owner changes somethins, name isn't registered that is fixed here
-            name = 'Thomas Dolman'
+            name = Group_Owner
 
         data.append([datetime, name, text])
 
     # remove a bad timepoint
-    data[0][0] = data[1][0]
+    if device == 'a':
+        data[0][0] = data[1][0]
     # get a pandas dataframe
     df = pd.DataFrame(data, columns=["Date", "Name", "Text"])
     # change index into timeseries.
@@ -162,10 +203,13 @@ def mediasend(df, savename):
 
     df_media = pd.DataFrame(who, columns=['Name', 'Media_send'])
     df_media_count = df_media.groupby(by='Name').count().sort_values(by='Media_send')
-    df_media_count.plot(kind='bar')
-    plt.ylabel("Images send")
-    plt.tight_layout()
-    plt.savefig(savename + "Images_send")
+
+    # Iphone works differently with media not attached
+    if len(df_media) != 0:
+        df_media_count.plot(kind='bar')
+        plt.ylabel("Images send")
+        plt.tight_layout()
+        plt.savefig(savename + "Images_send")
     print(df_media_count)
 
     return df_media_count
@@ -233,14 +277,6 @@ def timeanalysis(df, savename):
     plt.ylabel('Messages send')
     plt.title("Messages send over time")
     plt.savefig(savename + "When_we_talk")
-
-    # import pdb
-    # pdb.set_trace()
-    # # df_daily_count > 5
-    # df_daily_count.loc['2017-7-24':].plot()
-    # plt.ylabel('Messages send')
-    # plt.title("Messages send over time")
-    # plt.savefig(savename + "When_we_talk_zoomed")
 
     # When do we talk independent of days or whom
     df_hour_count = df.resample('H').count()
