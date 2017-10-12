@@ -1,3 +1,150 @@
+def loadtext(filename):
+    import numpy as np
+    import pandas as pd
+
+    # open the file, decide upon encoding type.
+    f = open(filename, mode='r', encoding="utf8")
+    # initialise empty list to store the data, and empty counts for different errors
+    data = []
+
+    print(filename)
+    Group_Owner = input("If you are the owner of the group, type your name here: ")
+
+    # check type of phone used, the text output is different.
+    device = input("Is your device an Iphone (i) or an Android (a)? ")
+
+    count_a, count_b = 0, 0
+    names_left = []
+    # loop over all lines in the text file
+    for line in f:
+        # print each line for visual inspection
+        print(line.strip())
+
+        if device == 'i':
+            if len(line) < 3:
+                continue
+            try:
+                datetime, name, text = line.split(": ")
+                date_t, time = datetime.split(" ")
+            except ValueError:
+                try:
+                    datetime, content = line.split(": ")
+                    date_t, time = datetime.split(" ")
+                    try:
+                        name, text = content.split(": ")
+                    except ValueError:
+                        name = np.nan
+                        text = content
+                except ValueError:
+                    try:
+                        datetime, name, content, content1 = line.split(": ")
+                        text = content + ": " + content1
+                        date_t, time = datetime.split(" ")
+                    except ValueError:
+                        text = line
+
+
+        elif device == 'a':
+
+            try:
+                # attempt to split line
+                datetime, content = line.split(" - ")
+                date_t, time = datetime.split(",")
+                # if this works, continue by splitting the content
+                try:
+                    name, text = content.split(": ")
+                    # otherwise store no name
+                except ValueError:
+                    try:
+                        name, text1, text2 = content.split(": ")
+                    except ValueError:
+
+                        if content[0] == 'U':
+                            name = Group_Owner
+                        elif content[-27:-1] == 'groepsafbeelding gewijzigd':
+                            splitvec = content.split(" ")
+                            name = splitvec[0] +" "+ splitvec[1]
+                            text = content
+                        elif content[-15:-1] == 'groep verlaten':
+                            splitvec = content.split(" ")
+                            name = splitvec[0] +" "+ splitvec[1]
+                            text = content
+                            # find something to solve this ugly problem
+                            if name == 'Anneliek Ter':
+                                name = "Anneliek Ter Horst"
+                            names_left.append(name)
+                        else:
+                            name = np.nan
+                            text = content
+
+            except ValueError:
+                try:
+                    # special cases, where there seems to be no text in the message
+                    datetime_old, namedate, content = line.split(" - ")
+                    name_old, datetime = namedate.split(": ")
+                    date_t, time = datetime.split(",")
+                    count_a += 1
+                    try:
+                        name, text = content.split(": ")
+                    except ValueError:
+                        name = np.nan
+                        text = content
+                        # sometimes the person uses an Enter, this cathes that problem
+                except ValueError:
+                    text = line
+                    count_b += 1
+
+        # reformate date information to suit Pandas Timeseries
+        date = "20" + date_t[-2:] + "-" + date_t[3:5] + "-" + date_t[:2]
+        if device == 'i':
+            datetime = date + " " + time
+        elif device == 'a':
+            datetime = date + time
+
+        # catch a known error
+        # TODO find a better solution for this.
+
+        if datetime == "20af-vr-Ik vanaf “borreltijd” gaat de CK gewoon dicht toch":
+            datetime, content, content1 = line.split(" - ")
+            content = content + content1
+            name, text = content.split(": ")
+            date_t, time = datetime.split(",")
+            date = "20" + date_t[-2:] + "-" + date_t[3:5] + "-" + date_t[:2]
+            datetime = date + time
+        if datetime == '2022-21-20 okt' or datetime == '2012-11-10 nov':
+            datetime = "2017-07-23 00:04:11"
+            name = "Marloes Westerwoudt"
+            text = "Inschrijven voor een weekend!!"
+
+        data.append([datetime, name, text])
+
+    # remove a bad timepoint
+    if device == 'a':
+        data[0][0] = data[1][0]
+    # get a pandas dataframe
+    df = pd.DataFrame(data, columns=["Date", "Name", "Text"])
+    # change index into timeseries.
+    df.Date = pd.to_datetime(df.Date, format='%Y-%m-%d')
+    df = df.set_index('Date')
+
+    if filename == "WhatsApp-chat met Congolezen.txt" or filename == "WhatsApp-chat met Niet zo zeuren.txt":
+        # ugly way of removing this name from the dataframe
+        df = df[df.Name != "Anneliek Ter Horst heeft een nieuw nummer"]
+
+    # remove people from the analysis that have left the group
+    for names in names_left:
+        df= df[df.Name != names]
+
+    # returns number of posts per name sorted
+    len_vec = []
+    for ind in range(len(df)):
+        len_vec.append(len(df.iloc[ind, 1]))
+
+    df['Len_text'] = len_vec
+
+    return df
+
+
 def analysewords(df, df_count):
     """
     check what words are said most, independent by whom
@@ -20,7 +167,7 @@ def analysewords(df, df_count):
 
     # print some useful info
     print("the total number of unique words is: {} out of {} total words".format(len(unique_words), len(all_words)))
-    print("Thus {} % is unique".format(round(100*len(unique_words)/len(all_words),3)))
+    print("Thus {} % is unique".format(round(100 * len(unique_words) / len(all_words), 3)))
 
     # get the occurrence of each word
     from collections import Counter
@@ -58,130 +205,6 @@ def analysewords(df, df_count):
     df_names_mentioned = pd.DataFrame(names_out, index=['First_Name', 'Last_Name'])
 
     return df_names_mentioned
-
-def loadtext(filename):
-    import numpy as np
-    import pandas as pd
-
-    # open the file, decide upon encoding type.
-    f = open(filename, mode='r', encoding="utf8")
-    # initialise empty list to store the data, and empty counts for different errors
-    data = []
-
-    Group_Owner = input("If you are the owner of the group, type your name here: ")
-
-    #check type of phone used, the text output is different.
-    device = input("Is your device an Iphone (i) or an Android (a)? ")
-
-    count_a, count_b = 0, 0
-    # loop over all lines in the text file
-    for line in f:
-        # print each line for visual inspection
-        print(line.strip())
-
-        if device == 'i':
-            if len(line)<3:
-                continue
-            try:
-                datetime, name, text = line.split(": ")
-                date_t, time = datetime.split(" ")
-            except ValueError:
-                try:
-                    datetime, content = line.split(": ")
-                    date_t, time = datetime.split(" ")
-                    try:
-                        name, text = content.split(": ")
-                    except ValueError:
-                        name = np.nan
-                        text = content
-                except ValueError:
-                    try:
-                        datetime, name, content, content1 = line.split(": ")
-                        text = content + ": " + content1
-                        date_t, time = datetime.split(" ")
-                    except ValueError:
-                        text = line
-
-
-        elif device == 'a':
-            try:
-                # attempt to split line
-                datetime, content = line.split(" - ")
-                date_t, time = datetime.split(",")
-                # if this works, continue by splitting the content
-                try:
-                    name, text = content.split(": ")
-                    # otherwise store no name
-                except ValueError:
-                    name = np.nan
-                    text = content
-
-            except ValueError:
-                try:
-                    # special cases, where there seems to be no text in the message
-                    datetime_old, namedate, content = line.split(" - ")
-                    name_old, datetime = namedate.split(": ")
-                    date_t, time = datetime.split(",")
-                    count_a += 1
-                    try:
-                        name, text = content.split(": ")
-                    except ValueError:
-                        name = np.nan
-                        text = content
-                    # sometimes the person uses an Enter, this cathes that problem
-                except ValueError:
-                    text = line
-                    count_b += 1
-
-
-        # reformate date information to suit Pandas Timeseries
-        date = "20" + date_t[-2:] + "-" + date_t[3:5] + "-" + date_t[:2]
-        datetime = date+" "+time
-
-
-        # catch a known error
-        # TODO find a better solution for this.
-
-        if datetime == "20af-vr-Ik vanaf “borreltijd” gaat de CK gewoon dicht toch":
-            datetime, content, content1 = line.split(" - ")
-            content = content + content1
-            name, text = content.split(": ")
-            date_t, time = datetime.split(",")
-            date = "20" + date_t[-2:] + "-" + date_t[3:5] + "-" + date_t[:2]
-            datetime = date + time
-        if datetime =='2022-21-20 okt' or datetime =='2012-11-10 nov':
-            datetime = "2017-07-23 00:04:11"
-            name = "Marloes Westerwoudt"
-            text = "Inschrijven voor een weekend!!"
-
-        if text[:6] == 'U hebt':
-            # If you are the group owner, this can change your actions to your name
-            # if the owner changes somethins, name isn't registered that is fixed here
-            name = Group_Owner
-
-        data.append([datetime, name, text])
-
-    # remove a bad timepoint
-    if device == 'a':
-        data[0][0] = data[1][0]
-    # get a pandas dataframe
-    df = pd.DataFrame(data, columns=["Date", "Name", "Text"])
-    # change index into timeseries.
-    df.Date = pd.to_datetime(df.Date, format='%Y-%m-%d')
-    df = df.set_index('Date')
-
-    if filename == "WhatsApp-chat met Congolezen.txt" or filename == "WhatsApp-chat met Niet zo zeuren.txt":
-        # ugly way of removing this name from the dataframe
-        df = df[df.Name != "Anneliek Ter Horst heeft een nieuw nummer"]
-
-    # returns number of posts per name sorted
-    len_vec = []
-    for ind in range(len(df)):
-        len_vec.append(len(df.iloc[ind, 1]))
-
-    df['Len_text'] = len_vec
-
-    return df
 
 
 def mediasend(df, savename):
@@ -227,35 +250,54 @@ def textanalysis(df, savename):
     import os
     import seaborn as sns
     import matplotlib.pyplot as plt
+    import pandas as pd
+    import numpy as np
+
     # change folder to save directory
     os.chdir('Output')
 
     # group the dataframe by Name
     df_count = df.groupby(by='Name').count().sort_values(by='Text')
+    df_count = pd.DataFrame(df_count.loc[:,'Text'])
     df_count_len = df.groupby(by='Name').sum().sort_values(by='Len_text')
-    # plot the number of times people sent messages and save the figure
 
+    if np.sum(df.groupby(by='Name').Len_text.max() > 400) >= 1:
+        print('This text is ridiculous long')
+        print(df.groupby(by='Name').Len_text.max()[df.groupby(by='Name').Len_text.max() > 400])
+
+    # plot the number of times people sent messages and save the figure
     sns.countplot(x="Name", data=df)
     plt.xticks(rotation=90)
     plt.tight_layout()
     plt.ylabel("Messages send")
+    purge_line_mes = df_count.mean() - 3.5 * df_count.sem()
+    plt.hlines(purge_line_mes, 0, len(df_count))
     plt.savefig(savename + "Messages_send")
 
     # same plot order low to high
     plt.figure()
-    df_count.Text.plot(kind='bar')
+    df_count.plot(kind='bar')
     plt.ylabel("Messages send")
     plt.tight_layout()
+    plt.hlines(purge_line_mes, 0, len(df_count))
     plt.savefig(savename + "Messages_send_ordered")
 
     # total number of characters send.
     plt.figure()
     df_count_len.plot(kind='bar')
     plt.ylabel('Text length')
+    purge_line_len = df_count_len.mean() - 3 * df_count_len.sem()
+    plt.hlines(purge_line_len, 0, len(df_count_len))
     plt.tight_layout()
     plt.savefig(savename + "Length of all text")
 
-    return df_count
+    ToPurge = df_count[df_count < purge_line_mes]
+    ToPurge['Length_text'] = df_count_len[df_count_len < purge_line_len]
+    ToPurge.loc['PurgeLine',:] = [purge_line_mes, purge_line_len]
+    ToPurge = ToPurge[ToPurge.Length_text.notnull()]
+    ToPurge = ToPurge.fillna('Safe')
+
+    return df_count, ToPurge
 
 
 def timeanalysis(df, savename):
