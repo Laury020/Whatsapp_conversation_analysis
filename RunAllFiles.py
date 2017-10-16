@@ -6,7 +6,7 @@
 # file that you want to use
 # be sure to change this before running the script
 import glob
-allfiles = glob.glob('*.txt')
+allfiles = glob.glob('bingowa.txt')
 
 from Master import Master
 

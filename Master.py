@@ -1,15 +1,17 @@
 def Master(filename):
     """ This runs all the computations and plots all the figures
     """
-
+    import analysis, os
     # note that ending on a number won't work
     savename = filename[18:-4] + "_"
+    print(filename)
 
     # load in the relevant data and turn it into a pandas DataFrame
-    import analysis
+
 
     # load the text
     df = analysis.loadtext(filename)
+    print(df)
     # count the words
     df_count = analysis.textanalysis(df, savename)
     # check who gets mentioned
@@ -24,7 +26,6 @@ def Master(filename):
     df_out = df_out.join(df_names_mentioned.transpose())
     df_out.to_csv(savename + "stats_per_name.csv")
 
-    import os
     os.chdir('..')
 
 if __name__=='__main__':

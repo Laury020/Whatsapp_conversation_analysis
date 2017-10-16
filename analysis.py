@@ -1,16 +1,24 @@
 def loadtext(filename):
     import numpy as np
     import pandas as pd
+    import pdb
 
     # open the file, decide upon encoding type.
     f = open(filename, mode='r', encoding="utf8")
     # initialise empty list to store the data, and empty counts for different errors
+    if f is None:
+        sys.exit("file corrupted")
     data = []
 
     print(filename)
 
     # check type of phone used, the text output is different.
-    device = input("Is your device an Iphone (i) or an Android (a)? ")
+    
+    
+    while True:
+        device = input("Is your device an Iphone (i) or an Android (a)? ")
+        if device is 'i' or device is 'a':
+            break 
 
     count_a, count_b = 0, 0
     left, deleted, added = [], [], []
@@ -25,7 +33,9 @@ def loadtext(filename):
             try:
                 datetime, name, text = line.split(": ")
                 date_t, time = datetime.split(" ")
+                
             except ValueError:
+                print('jeej')
                 try:
                     datetime, content = line.split(": ")
                     date_t, time = datetime.split(" ")
@@ -49,7 +59,7 @@ def loadtext(filename):
                 datetime, content = line.split(" - ")
                 date_t, time = datetime.split(",")
                 # if this works, continue by splitting the content
-                import pdb
+                
 
                 try:
                     name, text = content.split(": ")
@@ -166,6 +176,7 @@ def loadtext(filename):
     df.Date = pd.to_datetime(df.Date, format='%Y-%m-%d')
     df = df.set_index('Date')
 
+    f.close()
     # remove people from the analysis that have left the group
     for names in names_left:
         df = df[df.Name != names]
